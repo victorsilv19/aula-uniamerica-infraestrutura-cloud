@@ -1,1 +1,22 @@
-data
+# Dependências
+node_modules/
+
+# Terraform
+infra/.terraform/
+infra/.terraform.lock.hcl
+infra/terraform.tfstate
+infra/terraform.tfstate.backup
+infra/terraform.tfvars
+infra/*.tfplan
+
+# Variáveis de ambiente sensíveis
+.env
+.env.local
+.env.production
+
+# Build
+frontend/build/
+
+# OS
+.DS_Store
+Thumbs.db
