@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diagrama da Arquitetura</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 40px auto;
+            max-width: 1000px;
+            color: #333;
+        }
+        h1, h2 {
+            text-align: center;
+            color: #2c3e50;
+        }
+        .mermaid {
+            display: flex;
+            justify-content: center;
+            margin: 30px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+        @media print {
+            body { margin: 0; }
+            .no-print { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Diagrama da Arquitetura</h1>
+    <p style="text-align: center;">Infraestrutura implementada no Google Cloud Platform para o desafio, atendendo a todos os requisitos de segurança, redundância e comunicação exigidos.</p>
+
+    <div class="mermaid">
+flowchart TD
+    %% Atores e Internet
+    User(("Usuário (Internet)"))
+    DNS["Cloud DNS / DuckDNS<br/>(Resolução de Nomes)"]
+
+    %% Google Cloud Load Balancer (Proxy Reverso)
+    subgraph LB [Proxy Reverso Global - Load Balancer]
+        SSL["Certificado SSL<br/>(Gerenciado)"]
+        Armor["Google Cloud Armor<br/>(Firewall)"]
+        Router["URL Map (Roteamento)"]
+        
+        SSL --> Armor
+        Armor --> Router
+    end
+
+    %% Região 1 (us-central1)
+    subgraph Regiao1 [Região 1: us-central1]
+        NEG_FE1["NEG Serverless"]
+        FE1["Front-end (Cloud Run)<br/>Ingress: Internal & LB"]
+        NEG_BE["NEG Serverless"]
+        BE["Back-end API (Cloud Run)<br/>Ingress: Internal & LB"]
+        VPC["VPC Connector<br/>(Rede Privada)"]
+        
+        NEG_FE1 --> FE1
+        NEG_BE --> BE
+        BE --> VPC
+    end
+
+    %% Região 2 (us-east1)
+    subgraph Regiao2 [Região 2: us-east1]
+        NEG_FE2["NEG Serverless"]
+        FE2["Front-end (Cloud Run)<br/>Ingress: Internal & LB"]
+        
+        NEG_FE2 --> FE2
+    end
+
+    %% Banco de Dados
+    subgraph DB [MongoDB Atlas]
+        Atlas[("MongoDB Cluster<br/>(Serviço Gerenciado)")]
+        FW_Atlas{"Network Access<br/>(Firewall)"}
+        
+        FW_Atlas --> Atlas
+    end
+
+    %% Fluxos de Conexão - Usuário para Frontend
+    User -- "1. Acesso ao Domínio\n(HTTPS :443)" --> DNS
+    DNS -- "2. Resolve IP\n(136.69.42.110)" --> SSL
+    Router -- "3. deploynasexta\n(Balanceamento)" --> NEG_FE1
+    Router -- "3. deploynasexta\n(Balanceamento)" --> NEG_FE2
+
+    %% Fluxos de Conexão - Frontend para Backend
+    FE1 -. "4. Requisição API\n(HTTPS :443)" .-> DNS
+    FE2 -. "4. Requisição API\n(HTTPS :443)" .-> DNS
+    Router -- "5. api-deploynasexta\n(Roteamento API)" --> NEG_BE
+
+    %% Fluxo de Conexão - Backend para Banco de Dados
+    VPC -- "6. Conexão DB\n(TCP :27017)" --> FW_Atlas
+
+    %% Fluxos Bloqueados (Segurança)
+    Hacker(("Acesso Direto\nInternet"))
+    Hacker -.-x|BLOQUEADO| FE1
+    Hacker -.-x|BLOQUEADO| BE
+    Hacker -.-x|BLOQUEADO| FW_Atlas
+
+    classDef allowed fill:#d4edda,stroke:#28a745,stroke-width:2px;
+    classDef blocked fill:#f8d7da,stroke:#dc3545,stroke-width:2px,stroke-dasharray: 5 5;
+    classDef highlight fill:#cce5ff,stroke:#007bff,stroke-width:2px;
+    classDef db fill:#fff3cd,stroke:#ffc107,stroke-width:2px;
+
+    class LB highlight
+    class Regiao1,Regiao2 allowed
+    class DB db
+    class Hacker blocked
+    </div>
+
+    <h2>Resumo dos Controles de Acesso</h2>
+    <table>
+        <tr>
+            <th>Componente</th>
+            <th>Regra de Acesso</th>
+            <th>Fluxos Permitidos</th>
+            <th>Fluxos Bloqueados</th>
+        </tr>
+        <tr>
+            <td><strong>Load Balancer</strong></td>
+            <td>Exposto à internet na porta 443</td>
+            <td><code>Usuário → Load Balancer</code> (HTTPS)</td>
+            <td>Tráfego HTTP não seguro (porta 80) e portas diferentes da 443</td>
+        </tr>
+        <tr>
+            <td><strong>Front-end</strong></td>
+            <td>Bloqueado da internet (Ingress Restrito)</td>
+            <td><code>Load Balancer → Front-end</code></td>
+            <td><code>Internet → Front-end</code> (Acesso direto)</td>
+        </tr>
+        <tr>
+            <td><strong>Back-end</strong></td>
+            <td>Bloqueado da internet (Ingress Restrito)</td>
+            <td><code>Load Balancer → Back-end</code></td>
+            <td><code>Internet → Back-end</code> (Acesso direto)</td>
+        </tr>
+        <tr>
+            <td><strong>Cloud Armor</strong></td>
+            <td>Firewall de Borda</td>
+            <td>Tráfego web limpo</td>
+            <td>Ataques conhecidos, DDoS e IPs maliciosos</td>
+        </tr>
+        <tr>
+            <td><strong>MongoDB Atlas</strong></td>
+            <td>Firewall de Rede</td>
+            <td><code>Back-end (VPC) → Atlas</code> (TCP 27017)</td>
+            <td><code>Internet → Atlas</code></td>
+        </tr>
+    </table>
+
+    <script>mermaid.initialize({startOnLoad:true});</script>
+</body>
+</html>

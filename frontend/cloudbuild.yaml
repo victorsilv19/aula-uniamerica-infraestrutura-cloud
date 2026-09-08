@@ -1,0 +1,11 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '--build-arg'
+      - 'REACT_APP_API_URL=https://api-deploynasexta.duckdns.org'
+      - '-t'
+      - 'us-central1-docker.pkg.dev/todo-app-uniamerica/todo-app-repo/todo-frontend:latest'
+      - '.'
+images:
+  - 'us-central1-docker.pkg.dev/todo-app-uniamerica/todo-app-repo/todo-frontend:latest'

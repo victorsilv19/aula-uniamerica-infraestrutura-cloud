@@ -4,6 +4,10 @@ FROM node:18-alpine as build
 # Definindo o diretório de trabalho dentro do container
 WORKDIR /app
 
+# Argumento para a URL da API (passado no build)
+ARG REACT_APP_API_URL
+ENV REACT_APP_API_URL=$REACT_APP_API_URL
+
 # Copiando o package.json e o package-lock.json para instalar as dependências
 COPY package*.json ./
 
