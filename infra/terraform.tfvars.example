@@ -1,0 +1,29 @@
+# =============================================================================
+# terraform.tfvars.example
+# =============================================================================
+# Copie este arquivo para terraform.tfvars e preencha com seus valores
+#
+#   cp terraform.tfvars.example terraform.tfvars
+#
+# NUNCA commite o terraform.tfvars no git (contém credenciais)
+# =============================================================================
+
+# ID do projeto GCP (encontre em: console.cloud.google.com → Dashboard)
+project_id = "MEU-PROJETO-GCP-ID"
+
+# Regiões do Cloud Run
+region_primary   = "us-central1"
+region_secondary = "us-east1"
+
+# Domínios (solicitar ao professor Laércio)
+frontend_domain = "frontend-seugrupo.dominio-professor.com"
+backend_domain  = "api-seugrupo.dominio-professor.com"
+
+# URI do MongoDB Atlas
+# Obtenha em: MongoDB Atlas → Database → Connect → Drivers → Connection String
+mongodb_uri = "mongodb+srv://USUARIO:SENHA@cluster0.xxxxx.mongodb.net/todo-app?retryWrites=true&w=majority"
+
+# Imagens Docker no Artifact Registry
+# Após o build e push, use os caminhos do Artifact Registry
+frontend_image = "us-central1-docker.pkg.dev/MEU-PROJETO-GCP-ID/todo-app/frontend:latest"
+backend_image  = "us-central1-docker.pkg.dev/MEU-PROJETO-GCP-ID/todo-app/backend:latest"

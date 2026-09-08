@@ -17,9 +17,26 @@ mongoose.connect(mongoURI, {
   .then(() => console.log('Conectado ao MongoDB'))
   .catch((err) => console.error('Erro ao conectar ao MongoDB:', err));
 
-// Middleware para habilitar CORS e processar JSON
-app.use(cors());
+// CORS — restringir ao domínio do frontend em produção
+// Em produção: https://frontend-seugrupo.dominio.com
+// Em desenvolvimento: qualquer origem
+const allowedOrigins = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(',')
+  : ['*'];
+
+const corsOptions = {
+  origin: allowedOrigins.includes('*') ? '*' : allowedOrigins,
+  methods: ['GET', 'POST', 'PATCH', 'DELETE'],
+  allowedHeaders: ['Content-Type'],
+};
+
+app.use(cors(corsOptions));
 app.use(bodyParser.json());
+
+// Rota de health check (útil para o Load Balancer)
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok' });
+});
 
 // Definindo o modelo de Tarefa (To-do)
 const TodoSchema = new mongoose.Schema({
@@ -94,7 +111,8 @@ app.delete('/todos/:id', async (req, res) => {
   }
 });
 
-// Iniciando o servidor na porta 5000
-app.listen(port, () => {
+// Iniciando o servidor na porta configurada
+app.listen(port, '0.0.0.0', () => {
   console.log(`Servidor rodando na porta ${port}`);
 });
+
