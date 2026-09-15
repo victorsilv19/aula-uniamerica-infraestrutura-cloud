@@ -112,7 +112,7 @@ cd /caminho/para/aula-uniamerica-infraestrutura-cloud
 # ATENÇÃO: Substitua "api-seugrupo.dominio.com" pelo seu domínio real
 
 docker build \
-  --build-arg REACT_APP_API_URL=https://api-seugrupo.dominio.com \
+  --build-arg REACT_APP_API_URL=https://api-deploynasexta.duckdns.org \
   -t ${REGION_PRIMARY}-docker.pkg.dev/${PROJECT_ID}/todo-app/frontend:latest \
   ./frontend
 
@@ -184,7 +184,7 @@ gcloud run deploy backend \
   --ingress=internal-and-cloud-load-balancing \
   --allow-unauthenticated \
   --set-env-vars="MONGODB_URI=mongodb+srv://todouser:SENHA@cluster0.xxxxx.mongodb.net/todo-app?retryWrites=true&w=majority" \
-  --set-env-vars="CORS_ORIGIN=https://frontend-seugrupo.dominio.com" \
+  --set-env-vars="CORS_ORIGIN=https://deploynasexta.duckdns.org" \
   --set-env-vars="PORT=5000"
 ```
 
@@ -273,12 +273,12 @@ gcloud compute url-maps create backend-url-map \
 ```bash
 # Certificado SSL do Frontend
 gcloud compute ssl-certificates create frontend-ssl-cert \
-  --domains=frontend-seugrupo.dominio.com \
+  --domains=deploynasexta.duckdns.org \
   --global
 
 # Certificado SSL do Backend
 gcloud compute ssl-certificates create backend-ssl-cert \
-  --domains=api-seugrupo.dominio.com \
+  --domains=api-deploynasexta.duckdns.org \
   --global
 ```
 
@@ -442,8 +442,8 @@ Obrigado!
 
 ```bash
 # Verificar resolução DNS
-nslookup frontend-seugrupo.dominio.com
-nslookup api-seugrupo.dominio.com
+nslookup deploynasexta.duckdns.org
+nslookup api-deploynasexta.duckdns.org
 
 # Verificar certificado SSL (pode levar até 60 min)
 gcloud compute ssl-certificates describe frontend-ssl-cert --global
@@ -458,8 +458,8 @@ Após DNS e SSL estarem ativos, execute os testes do arquivo `plano-testes.md`.
 
 ```bash
 # Teste rápido
-curl -I https://frontend-seugrupo.dominio.com
-curl https://api-seugrupo.dominio.com/todos
+curl -I https://deploynasexta.duckdns.org
+curl https://api-deploynasexta.duckdns.org/todos
 ```
 
 ---

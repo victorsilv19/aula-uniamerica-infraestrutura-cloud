@@ -8,10 +8,10 @@ Este documento contém os **7 testes obrigatórios** exigidos pela atividade, co
 
 ```bash
 # Defina seus domínios aqui
-export FRONTEND_URL="https://frontend-seugrupo.dominio.com"
-export BACKEND_URL="https://api-seugrupo.dominio.com"
+export FRONTEND_URL="https://deploynasexta.duckdns.org"
+export BACKEND_URL="https://api-deploynasexta.duckdns.org"
 
-# URLs diretas do Cloud Run (obtidas no deploy)
+# URLs diretas do Cloud Run (obtidas no deploy - mantenha como referência interna)
 export FRONTEND_DIRECT="https://frontend-primary-xxxxx-uc.a.run.app"
 export BACKEND_DIRECT="https://backend-xxxxx-uc.a.run.app"
 ```
@@ -35,7 +35,7 @@ curl -I $FRONTEND_URL
 
 ### Verificação no Browser
 1. Abrir o browser
-2. Navegar para `https://frontend-seugrupo.dominio.com`
+2. Navegar para `https://deploynasexta.duckdns.org`
 3. A página "Lista de Tarefas" deve carregar
 4. Verificar o cadeado SSL (HTTPS) na barra de endereço
 
@@ -76,7 +76,7 @@ curl -s $BACKEND_URL/health
 **Objetivo**: Comprovar que o front-end consegue se comunicar com o back-end.
 
 ### Passos
-1. Abrir `https://frontend-seugrupo.dominio.com` no browser
+1. Abrir `https://deploynasexta.duckdns.org` no browser
 2. No campo de texto, digitar "Tarefa de Teste"
 3. Clicar em "Adicionar"
 4. A tarefa deve aparecer na lista abaixo
@@ -85,7 +85,7 @@ curl -s $BACKEND_URL/health
 1. Abrir DevTools do browser (F12)
 2. Ir na aba **"Network"**
 3. Recarregar a página
-4. Verificar que as requisições para `api-seugrupo.dominio.com/todos` retornam **200 OK**
+4. Verificar que as requisições para `api-deploynasexta.duckdns.org/todos` retornam **200 OK**
 
 ### Evidência
 > 📸 **Screenshot 1**: Página com a tarefa adicionada
@@ -215,7 +215,7 @@ curl -I $FRONTEND_URL
 # Resultado: HTTP/2 200
 
 # Testar no browser também
-# Abrir https://frontend-seugrupo.dominio.com → Deve carregar normalmente
+# Abrir https://deploynasexta.duckdns.org → Deve carregar normalmente
 ```
 
 #### 7.4 Restaurar a região primária
@@ -247,3 +247,64 @@ gcloud run services update frontend-primary \
 | 7 | Redundância (falha em uma região) | Site continua funcionando | ⬜ |
 
 > **Legenda**: ⬜ Não testado | ✅ Passou | ❌ Falhou
+
+---
+
+## Testes de Observabilidade (Entrega 2)
+
+### Teste O1: Gerar Tráfego Normal para os Painéis
+
+```bash
+# Criar 10 tarefas para gerar volume de POST
+for i in {1..10}; do
+  curl -s -X POST $BACKEND_URL/todos \
+    -H "Content-Type: application/json" \
+    -d "{\"text\": \"Tarefa de observabilidade $i\"}" > /dev/null
+  echo "Criada tarefa $i"
+done
+
+# Listar 5 vezes para gerar GETs
+for i in {1..5}; do
+  curl -s $BACKEND_URL/todos > /dev/null
+  echo "GET $i feito"
+done
+```
+
+**Evidência esperada**: Painéis de Volume e Desempenho no Cloud Monitoring devem mostrar picos de GET e POST.
+
+### Teste O2: Simular Erros para o Painel de Erros
+
+```bash
+# Acionar a rota de erro proposital 10 vezes
+for i in {1..10}; do
+  curl -s $BACKEND_URL/api/force-error
+  echo "Erro $i simulado"
+done
+```
+
+**Evidência esperada**: O Painel 3 (Taxa de Erros) deve exibir 10 ocorrências de erro 500.
+
+### Teste O3: Simular Indisponibilidade para o Uptime Check
+
+```bash
+# Desabilitar o frontend-primary (simula falha na regiao primária)
+gcloud run services update frontend-primary \
+  --max-instances=0 \
+  --region=us-central1
+
+# Aguardar 2-3 minutos para o Uptime Check detectar
+# Verificar no Cloud Monitoring → Uptime Checks → Deve mostrar falha
+
+# Restaurar
+gcloud run services update frontend-primary \
+  --max-instances=3 \
+  --region=us-central1
+```
+
+**Evidência esperada**: O Painel 1 (Disponibilidade) deve registrar queda e recuperação.
+
+| # | Teste | Evidência no Painel | Status |
+|---|---|---|---|
+| O1 | Gerar tráfego normal (10 POST + 5 GET) | Painéis de Volume e Desempenho | ⬜ |
+| O2 | Simular 10 erros via `/api/force-error` | Painel de Taxa de Erros | ⬜ |
+| O3 | Falha controlada no frontend-primary | Painel de Disponibilidade | ⬜ |
