@@ -3,6 +3,8 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 
+const crypto = require('crypto');
+
 // Inicializando o app Express
 const app = express();
 const port = process.env.PORT || 5000;
@@ -14,8 +16,8 @@ mongoose.connect(mongoURI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })
-  .then(() => console.log('Conectado ao MongoDB'))
-  .catch((err) => console.error('Erro ao conectar ao MongoDB:', err));
+  .then(() => logger.info('Conectado ao MongoDB'))
+  .catch((err) => logger.error('Erro ao conectar ao MongoDB:', err));
 
 // CORS — restringir ao domínio do frontend em produção
 // Em produção: https://frontend-seugrupo.dominio.com
@@ -33,9 +35,53 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(bodyParser.json());
 
+const pino = require('pino');
+const pinoHttp = require('pino-http');
+
+const logger = pino({
+  level: process.env.LOG_LEVEL || 'info',
+  formatters: {
+    level: (label) => {
+      return { level: label.toUpperCase() };
+    },
+  },
+  timestamp: pino.stdTimeFunctions.isoTime,
+});
+
+app.use(pinoHttp({
+  logger,
+  customProps: (req, res) => {
+    return {
+      service: 'backend-api',
+      environment: process.env.NODE_ENV || 'production',
+      correlation_id: req.headers['x-correlation-id'] || crypto.randomUUID(),
+      route: req.route ? req.route.path : req.originalUrl,
+    };
+  },
+  customSuccessMessage: function (req, res) {
+    return `HTTP ${req.method} ${req.url} completed`;
+  },
+  customErrorMessage: function (req, res, err) {
+    return `HTTP ${req.method} ${req.url} failed`;
+  }
+}));
+
+// Middleware auxiliar para capturar mensagens de erro antes de enviar a resposta
+const sendError = (res, statusCode, message) => {
+  res.locals.errorMessage = message;
+  return res.status(statusCode).json({ message });
+};
+
+
 // Rota de health check (útil para o Load Balancer)
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok' });
+});
+
+// Rota para simular erro 500 (Útil para testes de Observabilidade)
+app.get('/api/force-error', (req, res) => {
+  logger.error('Falha simulada acionada via /api/force-error');
+  res.status(500).json({ error: 'Erro simulado para teste de observabilidade' });
 });
 
 // Definindo o modelo de Tarefa (To-do)
@@ -52,7 +98,7 @@ app.get('/todos', async (req, res) => {
     const todos = await Todo.find(); // Retorna todas as tarefas do banco
     res.json(todos);
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    sendError(res, 500, err.message);
   }
 });
 
@@ -62,7 +108,7 @@ app.post('/todos', async (req, res) => {
 
   // Verifica se o campo "text" está presente
   if (!text) {
-    return res.status(400).json({ message: 'O campo "text" é obrigatório' });
+    return sendError(res, 400, 'O campo "text" é obrigatório');
   }
 
   const todo = new Todo({
@@ -74,7 +120,7 @@ app.post('/todos', async (req, res) => {
     const newTodo = await todo.save(); // Salva a tarefa no banco
     res.status(201).json(newTodo); // Retorna a tarefa criada
   } catch (err) {
-    res.status(400).json({ message: err.message }); // Retorna erro se houver falha no banco de dados
+    sendError(res, 400, err.message); // Retorna erro se houver falha no banco de dados
   }
 });
 
@@ -84,7 +130,7 @@ app.patch('/todos/:id', async (req, res) => {
     const todo = await Todo.findById(req.params.id); // Encontra a tarefa pelo ID
 
     if (!todo) {
-      return res.status(404).json({ message: 'Tarefa não encontrada' });
+      return sendError(res, 404, 'Tarefa não encontrada');
     }
 
     // Alterna o status de "completed" da tarefa
@@ -92,7 +138,7 @@ app.patch('/todos/:id', async (req, res) => {
     await todo.save(); // Salva a tarefa modificada
     res.json(todo); // Retorna a tarefa atualizada
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    sendError(res, 500, err.message);
   }
 });
 
@@ -102,17 +148,17 @@ app.delete('/todos/:id', async (req, res) => {
     const todo = await Todo.findByIdAndDelete(req.params.id); // Deleta a tarefa pelo ID
 
     if (!todo) {
-      return res.status(404).json({ message: 'Tarefa não encontrada' });
+      return sendError(res, 404, 'Tarefa não encontrada');
     }
 
     res.json({ message: 'Tarefa excluída com sucesso' }); // Retorna uma mensagem de sucesso
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    sendError(res, 500, err.message);
   }
 });
 
 // Iniciando o servidor na porta configurada
 app.listen(port, '0.0.0.0', () => {
-  console.log(`Servidor rodando na porta ${port}`);
+  logger.info(`Servidor rodando na porta ${port}`);
 });
 
